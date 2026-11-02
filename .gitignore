@@ -9,3 +9,20 @@ build/
 *.pem
 *.key
 secrets/
+
+# Private local references and deployment configuration
+/example/
+/task.md
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.jks
+*.kdbx
+*.db
+*.sqlite
+*.sqlite3
+*.log
+/private/
+/local/

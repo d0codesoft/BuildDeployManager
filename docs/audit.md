@@ -1,6 +1,6 @@
 # Audit of the supplied implementation
 
-All files in `example/` were inspected. Legacy scripts remain reference material and are excluded from distribution archives. Do not execute `init_server.sh` on an existing server.
+Legacy deployment scripts were audited and removed from the public repository and its history because they contained personal and infrastructure details. The table below summarizes the replaced behavior.
 
 | Input | Existing behavior | Findings and replacement |
 | --- | --- | --- |
