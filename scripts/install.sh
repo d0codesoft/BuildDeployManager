@@ -31,8 +31,13 @@ install -d -m 0700 -o scdeploy -g scdeploy /var/lib/scdeploy/artifacts /var/lib/
 install -d -m 0750 -o scdeploy -g scdeploy /var/log/scdeploy
 release="/opt/scdeploy/releases/$(date -u +%Y%m%dT%H%M%S)-$$"
 install -d -m 0755 "$release"
-python3 -m venv "$release/venv"
-"$release/venv/bin/pip" install --disable-pip-version-check "$src"
+# Both runtime identities must be able to read and execute the root-owned code.
+# Keep the restrictive installer umask for state, logs and secret directories.
+(
+  umask 022
+  python3 -m venv "$release/venv"
+  "$release/venv/bin/pip" install --disable-pip-version-check "$src"
+)
 install -d -m 0755 "$release/scripts"
 install -m 0755 "$src/scripts/rollback-manager.sh" "$release/scripts/rollback-manager.sh"
 old=''
