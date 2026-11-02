@@ -22,8 +22,9 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
       RELEASE_TAG: ${{ github.ref_name }}
-      PACKAGE_DIR: ${{ runner.temp }}/scdeploy-packages
     steps:
+      - name: Set package directory
+        run: echo "PACKAGE_DIR=$RUNNER_TEMP/scdeploy-packages" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
