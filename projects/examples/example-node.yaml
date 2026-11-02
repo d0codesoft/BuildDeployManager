@@ -1,0 +1,20 @@
+schema_version: 1
+project:
+  name: example-node
+  environment: staging
+source:
+  type: git
+  repository: https://example.com/organization/node-application.git
+build:
+  provider: node
+  node_major: 22
+  publish_directory: dist
+  tests: true
+deploy:
+  release_directory: /opt/example-node/releases
+  current_link: /opt/example-node/current
+  observe_only: true
+  services: [example-node.service]
+  require_signature: true
+updates:
+  mode: manual

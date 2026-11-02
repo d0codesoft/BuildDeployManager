@@ -1,0 +1,26 @@
+schema_version: 1
+project:
+  name: spc-webserver
+  description: Adjust repository and csproj after checking the SPC solution
+source:
+  type: git
+  repository: https://example.com/organization/SPC.git
+  branch: main
+  public_key: /etc/scdeploy/trust/spc.pem
+build:
+  provider: dotnet
+  runtime: linux-x64
+  self_contained: false
+  projects:
+    - path: SPC.WebServer/SPC.WebServer.csproj
+      output: server
+deploy:
+  release_directory: /opt/spc-webserver/releases
+  current_link: /opt/spc-webserver/current
+  observe_only: true
+  services: [spc-webserver.service]
+  healthchecks:
+    - type: http
+      url: http://127.0.0.1:5800/health
+updates:
+  mode: manual

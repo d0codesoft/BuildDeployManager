@@ -1,0 +1,21 @@
+[Unit]
+Description=SCODE project update policy checks
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=scdeploy
+Group=scdeploy
+UMask=0077
+ExecStart=/opt/scdeploy/current/venv/bin/scdeploy check-all --json
+TimeoutStartSec=2h
+CPUQuota=200%
+MemoryMax=2G
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+# NoNewPrivileges is intentionally absent: exact per-project sudoers rules
+# authorize start/stop/restart only. No root Python process is used.
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,45 @@
+schema_version: 1
+project:
+  name: scloud
+  description: Existing ExampleServer; import in observation mode first
+  environment: production
+source:
+  type: github
+  repository: example-org/example-dotnet-app
+  branch: master
+  auth_profile: github-scode
+  public_key: /etc/scdeploy/trust/scloud.pem
+build:
+  provider: dotnet
+  configuration: Release
+  runtime: linux-x64
+  self_contained: true
+  restore: true
+  tests: true
+  projects:
+    - path: ExampleServer/ExampleServer.csproj
+      output: server
+    - path: ExampleAdmin/ExampleAdmin.csproj
+      output: admin
+deploy:
+  provider: systemd-symlink
+  release_directory: /opt/scloud/releases
+  current_link: /opt/scloud/current
+  observe_only: true
+  require_signature: true
+  services: [kestrel-scloud.service]
+  healthchecks:
+    - type: http
+      url: http://127.0.0.1:5770/health
+      expected_status: 200
+      timeout_seconds: 60
+  rollback:
+    enabled: true
+    keep_releases: 5
+updates:
+  mode: manual
+  check_interval: 30m
+notifications:
+  email:
+    enabled: false
+    profile: primary-smtp

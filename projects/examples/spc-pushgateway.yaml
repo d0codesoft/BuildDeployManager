@@ -1,0 +1,20 @@
+schema_version: 1
+project:
+  name: spc-pushgateway
+source:
+  type: http
+  metadata_url: https://updates.example.com/api/projects/spc-pushgateway/latest
+  trusted_hosts: [updates.example.com]
+  public_key: /etc/scdeploy/trust/spc-pushgateway.pem
+deploy:
+  release_directory: /opt/spc-pushgateway/releases
+  current_link: /opt/spc-pushgateway/current
+  observe_only: true
+  services: [spc-pushgateway.service]
+  healthchecks:
+    - type: tcp
+      host: 127.0.0.1
+      port: 5900
+updates:
+  mode: notify
+  check_interval: 30m

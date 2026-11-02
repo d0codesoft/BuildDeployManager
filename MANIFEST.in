@@ -1,0 +1,7 @@
+include README.md
+recursive-include docs *.md
+recursive-include projects *.yaml
+recursive-include scripts *.sh *.py
+recursive-include systemd *.service *.timer
+prune example
+prune .tools

@@ -1,0 +1,113 @@
+name: Build and release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scdeploy-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.ref_name }}
+      PACKAGE_DIR: ${{ runner.temp }}/scdeploy-packages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build and test dependencies
+        run: python -m pip install -e '.[test]' build
+      - name: Validate release tag
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          python - <<'PY'
+          import os
+          import tomllib
+          from packaging.version import Version
+          with open('pyproject.toml', 'rb') as stream:
+              version = tomllib.load(stream)['project']['version']
+          if os.environ['REF_TYPE'] != 'tag' or os.environ['RELEASE_TAG'] != f'v{version}':
+              raise SystemExit(f'Run this workflow on the existing v{version} tag')
+          if Version(version).is_prerelease or Version(version).is_devrelease:
+              raise SystemExit('This workflow publishes stable releases only')
+          PY
+      - name: Test
+        run: |
+          python -m pytest -q
+          for script in scripts/*.sh tests/ubuntu-e2e.sh; do
+            bash -n "$script"
+          done
+      - name: Build wheel and source distribution
+        run: python -m build --outdir "$PACKAGE_DIR"
+      - name: Create source ZIP and checksums
+        run: |
+          python - <<'PY'
+          import hashlib
+          import os
+          import tarfile
+          import zipfile
+          from pathlib import Path
+          directory = Path(os.environ['PACKAGE_DIR'])
+          source, = directory.glob('*.tar.gz')
+          archive = directory / (source.name.removesuffix('.tar.gz') + '-source.zip')
+          with tarfile.open(source, 'r:gz') as tar, zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
+              for member in tar:
+                  if member.isfile():
+                      info = zipfile.ZipInfo(member.name)
+                      info.create_system = 3
+                      info.external_attr = (0o100000 | member.mode) << 16
+                      info.compress_type = zipfile.ZIP_DEFLATED
+                      with tar.extractfile(member) as stream:
+                          output.writestr(info, stream.read())
+          files = sorted(path for path in directory.iterdir() if path.is_file())
+          with (directory / 'SHA256SUMS').open('w', encoding='utf-8', newline='\n') as output:
+              for path in files:
+                  with path.open('rb') as stream:
+                      output.write(f'{hashlib.file_digest(stream, "sha256").hexdigest()}  {path.name}\n')
+          PY
+      - name: Save build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scdeploy-release
+          path: ${{ env.PACKAGE_DIR }}/*
+          if-no-files-found: error
+      - name: Publish release with all assets
+        run: |
+          gh release create "$RELEASE_TAG" "$PACKAGE_DIR"/* \
+            --verify-tag --title "scdeploy $RELEASE_TAG" --generate-notes --latest
+      - name: Delete previous published stable releases
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          repository = os.environ['GH_REPO']
+          current = json.loads(subprocess.check_output(
+              ['gh', 'api', f'repos/{repository}/releases/latest'], text=True))
+          if current['tag_name'] != os.environ['RELEASE_TAG']:
+              raise SystemExit('Latest release changed; skipping cleanup')
+          pages = json.loads(subprocess.check_output(
+              ['gh', 'api', '--paginate', '--slurp', f'repos/{repository}/releases?per_page=100'], text=True))
+          for page in pages:
+              for release in page:
+                  if (release['id'] != current['id'] and not release['draft']
+                          and not release['prerelease'] and release['published_at']
+                          and release['published_at'] < current['published_at']):
+                      print(f"Deleting previous release: {release['tag_name']}", flush=True)
+                      subprocess.run(['gh', 'api', '--method', 'DELETE',
+                                      f"repos/{repository}/releases/{release['id']}"], check=True)
+          PY

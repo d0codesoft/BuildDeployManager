@@ -1,0 +1,19 @@
+schema_version: 1
+project:
+  name: example-python
+  environment: staging
+source:
+  type: git
+  repository: https://example.com/organization/python-application.git
+build:
+  provider: python
+  python_executable: python3
+  requirements: requirements.txt
+  tests: true
+  distribution: true
+  publish_directory: dist
+deploy:
+  release_directory: /opt/example-python/releases
+  current_link: /opt/example-python/current
+  observe_only: true
+  services: [example-python.service]

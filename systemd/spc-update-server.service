@@ -1,0 +1,59 @@
+[Unit]
+Description=SPC Update Server
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+# Program.cs does not register systemd readiness notifications.
+Type=exec
+User=spc-update-server
+Group=spc-update-server
+WorkingDirectory=/opt/spc-update-server/current/server
+ExecStart=/usr/bin/dotnet /opt/spc-update-server/current/server/SPC.Update.Server.dll
+
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_ENVIRONMENT=Production
+# Local HTTP backend for a separately configured HTTPS reverse proxy.
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5151
+Environment=ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+Environment=DOTNET_NOLOGO=true
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+
+# Persistent HOME also keeps default ASP.NET Core Data Protection keys.
+Environment=HOME=/var/lib/spc-update-server
+Environment=Storage__WorkingDirectory=/var/lib/spc-update-server/work
+Environment=Storage__ReleaseDataDirectory=/var/lib/spc-update-server/packages
+Environment=Database__EnsureCreated=false
+Environment=Database__ApplyMigrations=false
+EnvironmentFile=/etc/scdeploy/apps/spc-update-server.env
+
+StateDirectory=spc-update-server
+StateDirectoryMode=0750
+LogsDirectory=spc-update-server
+LogsDirectoryMode=0750
+UMask=0027
+
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=60
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/spc-update-server /var/log/spc-update-server
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=spc-update-server
+
+[Install]
+WantedBy=multi-user.target
