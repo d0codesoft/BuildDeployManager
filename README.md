@@ -2,8 +2,8 @@
 
 GitHub releases are built by `.github/workflows/release.yml`. Set the version in
 `pyproject.toml` and `src/scdeploy/__init__.py`, commit the changes, then push the
-matching tag (for example, `v0.1.0`). You can also run the workflow manually on
-that existing tag. It runs tests, builds a wheel and source distribution, and
+matching tag (for example, `v0.1.0`). You can also run the workflow manually on `main`; it creates the matching
+version tag at the selected commit. Existing tags must point to that same commit. It runs tests, builds a wheel and source distribution, and
 publishes a source ZIP plus SHA-256 checksums with the release. After successful
 publication it deletes older published stable releases and their assets, keeping
 Git tags, drafts and prereleases. Re-running a tag that already has a release

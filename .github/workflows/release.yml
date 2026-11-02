@@ -21,17 +21,16 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: ${{ github.ref_name }}
     steps:
       - name: Set package directory
         run: echo "PACKAGE_DIR=$RUNNER_TEMP/scdeploy-packages" >> "$GITHUB_ENV"
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install build and test dependencies
         run: python -m pip install -e '.[test]' build
-      - name: Validate release tag
+      - name: Resolve and validate release tag
         env:
           REF_TYPE: ${{ github.ref_type }}
         run: |
@@ -41,11 +40,24 @@ jobs:
           from packaging.version import Version
           with open('pyproject.toml', 'rb') as stream:
               version = tomllib.load(stream)['project']['version']
-          if os.environ['REF_TYPE'] != 'tag' or os.environ['RELEASE_TAG'] != f'v{version}':
-              raise SystemExit(f'Run this workflow on the existing v{version} tag')
+          tag = f'v{version}'
+          if os.environ['REF_TYPE'] == 'tag' and os.environ['GITHUB_REF_NAME'] != tag:
+              raise SystemExit(f'Tag must match package version: {tag}')
           if Version(version).is_prerelease or Version(version).is_devrelease:
               raise SystemExit('This workflow publishes stable releases only')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as stream:
+              stream.write(f'RELEASE_TAG={tag}\n')
           PY
+      - name: Check existing tag points to this commit
+        run: |
+          refs=$(git ls-remote origin "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}")
+          if [[ -n "$refs" ]]; then
+            commit=$(printf '%s\n' "$refs" | tail -n 1 | cut -f1)
+            if [[ "$commit" != "$GITHUB_SHA" ]]; then
+              echo "Tag $RELEASE_TAG already points to another commit; bump the package version." >&2
+              exit 1
+            fi
+          fi
       - name: Test
         run: |
           python -m pytest -q
@@ -81,7 +93,7 @@ jobs:
                       output.write(f'{hashlib.file_digest(stream, "sha256").hexdigest()}  {path.name}\n')
           PY
       - name: Save build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: scdeploy-release
           path: ${{ env.PACKAGE_DIR }}/*
@@ -89,7 +101,7 @@ jobs:
       - name: Publish release with all assets
         run: |
           gh release create "$RELEASE_TAG" "$PACKAGE_DIR"/* \
-            --verify-tag --title "scdeploy $RELEASE_TAG" --generate-notes --latest
+            --target "$GITHUB_SHA" --title "scdeploy $RELEASE_TAG" --generate-notes --latest
       - name: Delete previous published stable releases
         run: |
           python - <<'PY'
